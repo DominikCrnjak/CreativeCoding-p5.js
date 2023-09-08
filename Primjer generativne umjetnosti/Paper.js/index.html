@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Mozaik krugova od slike</title>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.15/paper-full.min.js"></script>
+	<style>
+		body{
+			margin:0;
+		}
+	</style>
+</head>
+
+<body>
+	<canvas id="canvas"></canvas>
+
+	<input type="file" id="input" accept="image/*">
+
+	<button onclick="exportToSVG()">Export u SVG</button>
+
+	<script>
+		// Inicijaliziraj Paper.js platno
+		paper.setup('canvas');
+
+		// Funkcija za crtanje mozaika
+		function drawElements() {
+			// Dohvati odabranu sliku
+			var file = document.getElementById('input').files[0];
+			var reader = new FileReader();
+			reader.readAsDataURL(file);
+			reader.onload = function (event) {
+				var img = new Image();
+				img.src = event.target.result;
+				img.onload = function() {
+					// Stvori novi raster objekt iz slike
+					var raster = new paper.Raster(img);
+					// Promijeni veličinu platna na veličinu slike
+					paper.view.viewSize = new paper.Size(raster.width, raster.height);
+
+					// Iteriraj kroz piksele slike i stvaraj elemente
+					for (var x = 0; x < raster.width; x += 10) {
+						for (var y = 0; y < raster.height; y += 10) {
+							// Dohvati boju piksela
+							var pixelColor = raster.getPixel(x, y);
+							// Stvori novu krivulju
+							var path = new paper.Path();
+
+							var startPoint = new paper.Point(x,y);
+							path.moveTo(startPoint);
+
+							var handlePoint1 = new paper.Point(x + Math.random() * 160 , y + Math.random() * 50 - 25);
+    						var handlePoint2 = new paper.Point(x + Math.random() * 27, y + Math.random() * 70);
+    						var endPoint = new paper.Point(x+ Math.random() * 50 , y + Math.random() * 20);
+    						var curveSegment = new paper.Segment(handlePoint1, handlePoint2, endPoint);
+    						path.add(curveSegment);
+
+
+							path.strokeColor = pixelColor;
+						    path.strokeWidth =  Math.floor(Math.random() * 20);
+							path.strokeCap = 'round';
+
+						
+						}
+					}
+					// Ukloni raster objekt slike
+					raster.remove();
+				}
+			}
+		}
+    function exportToSVG() {
+			// Dobavi SVG sadržaj iz Paper.js platna
+			var svg = paper.project.exportSVG({asString: true});
+
+			// Kreiraj novu datoteku s SVG sadržajem
+			var blob = new Blob([svg], {type: "image/svg+xml"});
+			var url = URL.createObjectURL(blob);
+			var link = document.createElement("a");
+			link.download = "canvas.svg";
+			link.href = url;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+		}
+
+		// Dodaj događaj za odabir slike
+		document.getElementById('input').addEventListener('change', drawElements, false);
+	</script>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Zagreb karta s D3.js i Leafletom</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/d3@6.7.0/dist/d3.min.js"></script>
+</head>
+
+<body>
+  <div id="map" style="width: 800px; height: 600px;"></div>
+  <script>
+    // Stvaranje Leaflet karte
+    let map = L.map('map').setView([45.815010, 15.981919], 13); // Postavite koordinate centra karte i razinu zumiranja
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    const svgLayer = L.svg();
+    svgLayer.addTo(map);
+
+    const svg = d3.select(map.getPanes().overlayPane).select('svg');
+    const g = svg.append('g').attr('class', 'leaflet-zoom-hide');
+
+
+    d3.csv('./zagreb_points.csv').then(function (tocke) {
+      d3.json('./map.geo.json').then(function (data) {
+
+        data.features.forEach(function (poligon) {
+
+          var brojTocaka = 0;
+          tocke.forEach(function (tocka) {
+            var tockaLon = tocka.X;
+            var tockaLat = tocka.Y;
+
+            if (d3.polygonContains(poligon.geometry.coordinates, [tockaLon, tockaLat])) {
+              brojTocaka = brojTocaka + Number(tocka.BROJ_UTICNICA);
+            }
+          });
+
+          L.geoJSON(poligon, {
+            style: function (feature) {
+
+              // Definiranje skale za bojanje ovisno o broju točaka
+              var bojaSkala = d3.scaleSequential()
+                .interpolator(d3.interpolateBlues) 
+                .domain([0, d3.max(Object.values(brojTocaka))]);
+
+              return {
+                color: bojaSkala(brojTocaka), // boja ispune poligona
+                fillOpacity: 0.9, // prozirnost ispune poligona (0-1)
+                weight: 1, // debljina obruba poligona
+              };
+            },
+            onEachFeature: function (feature, layer) {
+              var name = feature.properties.name;
+              layer.bindPopup(name);
+            },
+          }).addTo(map);
+
+        });
+
+      });
+    });
+
+    function update() {
+      g.selectAll('.circle').remove();
+      d3.csv('./zagreb_points.csv').then(function (data) {
+        const radiusScale = d3.scaleLinear()
+          .domain(d3.extent(data, d => parseFloat(d.BROJ_UTICNICA))) // Pretpostavljamo da "radius" sadrži numeričke vrijednosti
+          .range([30, 60]); // Definiramo raspon radijusa krugova
+
+
+        data.forEach(function (d) {
+          var lat = parseFloat(d.Y);
+          var lon = parseFloat(d.X);
+          var naziv = d.ADRESA;
+          var radius = radiusScale(parseFloat(d.BROJ_UTICNICA))/4;
+
+          g.append('circle')
+            .attr('class', 'circle')
+            .attr('cx', map.latLngToLayerPoint([lat, lon]).x)
+            .attr('cy', map.latLngToLayerPoint([lat, lon]).y)
+            .attr('r', radius)
+            .style('fill', 'red')
+            .style('fill-opacity', 0.5)
+            .on('mouseover', function (e) {
+              d3.select(this).append('title').text(naziv);
+            })
+            .on('mouseout', function (e) {
+              d3.select(this).select('title').remove();
+            });
+        });
+      });
+    }
+
+    map.on('zoomend', update);
+
+    update();
+  </script>
+</body>
+</html>
